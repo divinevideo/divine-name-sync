@@ -1,0 +1,24 @@
+{
+  "name": "divine-name-sync",
+  "version": "1.0.0",
+  "description": "Webhook receiver for syncing divine-name-server usernames to Fastly KV",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "js-compute-runtime ./src/index.js ./bin/main.wasm",
+    "deploy": "fastly compute publish",
+    "dev": "fastly compute serve"
+  },
+  "keywords": [
+    "fastly",
+    "compute",
+    "nostr",
+    "nip-05",
+    "webhook"
+  ],
+  "author": "Divine <hello@divine.video>",
+  "license": "MIT",
+  "devDependencies": {
+    "@fastly/js-compute": "^3.38.2"
+  }
+}

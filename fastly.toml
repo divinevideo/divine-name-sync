@@ -1,0 +1,45 @@
+# This file describes a Fastly Compute package. To learn more visit:
+# https://www.fastly.com/documentation/reference/compute/fastly-toml
+
+authors = ["Divine <hello@divine.video>"]
+description = "Webhook receiver for syncing divine-name-server usernames to Fastly KV"
+language = "javascript"
+manifest_version = 3
+name = "divine-name-sync"
+service_id = "keqSxRML0NxLxA6jChGqlz"
+
+[local_server]
+
+  [local_server.kv_stores]
+
+    [local_server.kv_stores.divine-names]
+      file = "test-data/names.json"
+      format = "json"
+
+    [local_server.kv_stores.sync-failures]
+      file = "test-data/failures.json"
+      format = "json"
+
+  [local_server.secret_stores]
+
+    [local_server.secret_stores.divine-name-sync-secrets]
+      file = "secrets.local.json"
+      format = "json"
+
+[scripts]
+  build = "npm run build"
+
+[setup]
+
+  [setup.kv_stores]
+
+    [setup.kv_stores.divine-names]
+      description = "Username to pubkey mappings for NIP-05"
+
+    [setup.kv_stores.sync-failures]
+      description = "Log of sync failures for debugging"
+
+  [setup.secret_stores]
+
+    [setup.secret_stores.divine-name-sync-secrets]
+      description = "Webhook authentication secrets"

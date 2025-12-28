@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+bin/
+pkg/
+
+# Local secrets (never commit)
+secrets.local.json
+
+# Static publisher artifacts
+static-publisher/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
