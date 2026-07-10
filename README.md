@@ -111,3 +111,7 @@ curl -X POST http://localhost:7676/sync \
 ## License
 
 MIT
+
+---
+
+Part of [Divine](https://divine.video) — your playground for human creativity · [Brand guidelines](https://github.com/divinevideo/brand-guidelines)
