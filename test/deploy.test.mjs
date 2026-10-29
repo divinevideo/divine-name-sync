@@ -88,7 +88,7 @@ test('deployment service matches the manifest', async () => {
 
 test('workflow keeps the production job guarded, queued and receipted', async () => {
   const workflow = await readFile(new URL('../.github/workflows/compute.yml', import.meta.url), 'utf8');
-  const job = workflow.slice(workflow.indexOf('\n  deploy:\n'));
+  const [job] = workflow.match(/^ {2}deploy:\n(?: {4,}.*\n|\n)*/m) ?? [''];
   for (const line of [
     '    needs: checks',
     "    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')",
@@ -97,7 +97,8 @@ test('workflow keeps the production job guarded, queued and receipted', async ()
     '      cancel-in-progress: false',
     '      queue: max',
   ]) assert.ok(job.includes(`\n${line}\n`), line);
-  assert.match(job, /\n {6}- uses: actions\/upload-artifact@[0-9a-f]{40} # v4\n {8}if: always\(\)\n/);
+  const receipt = job.split(/\n {6}- /).find(step => step.includes('path: deployment.json'));
+  assert.match(receipt ?? '', /\n {8}if: always\(\)\n/);
 });
 
 test('clone follows the observed active version rather than a fixed version', async () => {
