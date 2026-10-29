@@ -144,8 +144,8 @@ for (const fault of ['account', 'binding', 'domain', 'validation', 'upload', 'ac
     const original = dependencies.api;
     dependencies.api = async (path, options) => {
       if (fault === 'account' && !path.includes('/version')) return { customer_id: 'wrong-account' };
-      if (fault === 'binding' && path.endsWith('/resource')) return [];
-      if (fault === 'domain' && path.endsWith('/domain')) return [];
+      if (fault === 'binding' && path.endsWith('/resource')) return Object.entries(resources).map(([name, resource_id]) => ({ name, resource_id: name === 'sync-failures' ? 'other-id' : resource_id }));
+      if (fault === 'domain' && path.endsWith('/domain')) return [{ name: 'other.example.test' }];
       if (fault === 'validation' && path.endsWith('/validate')) return { status: 'error' };
       if (fault === 'activation' && path.endsWith('/activate')) throw new Error('activation failed');
       const value = await original(path, options);
