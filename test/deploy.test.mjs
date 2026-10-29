@@ -162,6 +162,7 @@ for (const fault of ['account', 'binding', 'domain', 'validation', 'upload', 'ac
     }
     if (fault === 'activation') {
       assert.equal(records.at(-1).activation_status, 'unknown');
+      assert.equal(records.at(-1).activated, false);
     }
     if (fault === 'health') {
       assert.equal(records.at(-1).activated, true);
