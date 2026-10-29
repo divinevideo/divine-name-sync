@@ -114,8 +114,18 @@ test('workflow pins its actions and keeps the production job guarded, queued and
   assert.match(setup ?? '', /\n {10}token: \$\{\{ github\.token \}\}(?:\n|$)/);
   const pin = workflow.indexOf('name: Install pinned wasm-tools');
   assert.ok(pin > 0 && pin < workflow.indexOf('- run: fastly compute build'));
-  assert.ok(workflow.includes('wasm-tools/releases/download/v1.262.0/wasm-tools-1.262.0-x86_64-linux.tar.gz'));
-  assert.ok(workflow.includes("\n          echo '655b8df67d54c3ef9b52fc237c4e94bbfbb5f5f43825245cb0940a7002a9ed65  wasm-tools.tar.gz' | sha256sum --check --strict\n"));
+  // Pinned whole: a shell override, `set +e`, continue-on-error or a dropped PATH export would ship an unverified or latest wasm-tools.
+  assert.doesNotMatch(workflow, /^\s*shell:/m);
+  assert.equal(workflow.split(/\n {6}- /).find(step => step.startsWith('name: Install pinned wasm-tools')), [
+    'name: Install pinned wasm-tools',
+    '        run: |',
+    '          cd "$RUNNER_TEMP"',
+    '          curl --fail --location --retry 3 https://github.com/bytecodealliance/wasm-tools/releases/download/v1.262.0/wasm-tools-1.262.0-x86_64-linux.tar.gz -o wasm-tools.tar.gz',
+    "          echo '655b8df67d54c3ef9b52fc237c4e94bbfbb5f5f43825245cb0940a7002a9ed65  wasm-tools.tar.gz' | sha256sum --check --strict",
+    '          tar -xzf wasm-tools.tar.gz',
+    '          echo "$RUNNER_TEMP/wasm-tools-1.262.0-x86_64-linux" >> "$GITHUB_PATH"',
+    '          "$RUNNER_TEMP/wasm-tools-1.262.0-x86_64-linux/wasm-tools" --version',
+  ].join('\n'));
 });
 
 test('clone follows the observed active version rather than a fixed version', async () => {
