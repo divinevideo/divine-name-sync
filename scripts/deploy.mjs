@@ -48,7 +48,7 @@ export async function deploy(config, { api, currentMain, health, upload, record 
   }
   const domains = await api(`${service}/version/${previous.number}/domain`);
   if (!domains.some(domain => domain.name === config.health.hostname)) throw new Error('Health hostname is not bound to this service');
-  const result = { source_sha: config.sha, service_id: SERVICE_ID, environment: 'production', previous_version: previous.number, result: 'started' };
+  const result = { source_sha: config.sha, service_id: SERVICE_ID, environment: 'production', previous_version: previous.number, activated: false, activation_status: 'not-attempted', result: 'started' };
   await record(result);
   try {
     const clone = await api(`${service}/version/${previous.number}/clone`, { method: 'PUT' });
@@ -60,7 +60,12 @@ export async function deploy(config, { api, currentMain, health, upload, record 
     if (validation.status !== 'ok') throw new Error('Fastly version validation failed');
     await assertCurrent();
     if ((await active()).number !== previous.number) throw new Error('Active version changed outside this deployment');
+    result.activation_status = 'unknown';
+    await record(result);
     await api(`${service}/version/${clone.number}/activate`, { method: 'PUT' });
+    result.activated = true;
+    result.activation_status = 'confirmed';
+    await record(result);
     const serving = await active();
     if (serving.number !== clone.number || serving.comment !== `source:${config.sha}`) throw new Error('Active version verification failed');
     await health(config.health);

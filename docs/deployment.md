@@ -44,17 +44,27 @@ validation it rechecks the main tip and unchanged active version, then activates
 
 ## Ordering and release evidence
 
-The production job uses one non-cancelling concurrency group. GitHub need not
-schedule waiting jobs FIFO: stale jobs therefore fail if their source is no
-longer main, both before cloning and immediately before activation. A running
-older deployment may finish before the newer one; queued older work cannot
-overwrite a newer successful main release. Coordinate all manual provider
+The production job uses one non-cancelling concurrency group with `queue: max`.
+Up to 100 pending jobs wait in the order they entered the queue, rather than
+replacing the previous pending job. An old run cannot cancel the current tip's
+pending deploy just by entering that queue. Jobs beyond that queue limit are
+cancelled by GitHub and require a current-main replay. Stale jobs fail if their
+source is no longer main, both before cloning and immediately before activation.
+A running older deployment may finish before the newer one; queued older work
+cannot overwrite a newer successful main release. Coordinate all manual provider
 changes with this same production lane; external actors are not locked by
 GitHub concurrency. A main push after the final check can leave production
 temporarily behind until its own checked run deploys.
 
 `deployment.json` records source SHA, environment, service, previous version,
-new provider version and success/failure after provider preflight. It is retained
+new provider version and success/failure after provider preflight. `activated`
+becomes `true` immediately after the activation request succeeds, before active
+version and health verification. `activation_status` distinguishes `not-attempted`,
+`unknown` (request about to be sent or its result uncertain), and `confirmed`
+(activation request succeeded). An `unknown` receipt requires checking Fastly's
+actual active version; `activated: false` alone does not prove nothing changed.
+These fields separate pre-activation failures from a failed verification after
+activation. The receipt is retained
 as a run artifact, including after upload/validation/activation/health failures.
 Failures before preflight remain failed step logs with no deployment receipt.
 The provider version comment also records `source:<full SHA>`. A success requires
@@ -77,7 +87,10 @@ obsolete SHA to roll back.
 For rollback, first pause the automated lane by unsetting `FASTLY_CD_ENABLED`,
 and ensure any in-flight production job has finished before changing provider
 state. From the failed run's receipt, identify and independently verify the
-previous version and its source. With separately authorized production access,
+previous version and its source. Check `activation_status` and the actual active
+version before deciding whether rollback is needed; a failed health check can
+leave the new version active, and a failed activation response can be uncertain.
+With separately authorized production access,
 activate that existing known-good version in Fastly. Verify the active version
 and the same safe health endpoint, then record the incident, version and source.
 Do not delete versions or stores. Prefer a revert PR to main for a durable
