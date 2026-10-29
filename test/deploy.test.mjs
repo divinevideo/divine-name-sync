@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { configuration, deploy, SERVICE_ID } from '../scripts/deploy.mjs';
 
 const sha = 'a'.repeat(40);
@@ -180,3 +184,79 @@ for (const fault of ['account', 'binding', 'domain', 'validation', 'upload', 'ac
     }
   });
 }
+
+// Replaces fetch inside the spawned deploy process; every request is logged to calls.jsonl.
+function stubNetwork(appendFileSync, scenario, sha, resources) {
+  let activated = false;
+  let comment = '';
+  const json = (body, status = 200) => new Response(JSON.stringify(body), { status });
+  globalThis.fetch = async (input, options = {}) => {
+    const url = String(input);
+    const headers = new Headers(options.headers);
+    const form = options.body instanceof FormData ? [...options.body.keys()] : undefined;
+    appendFileSync('calls.jsonl', `${JSON.stringify({ url, redirect: options.redirect, form, fastlyKey: headers.has('fastly-key'), authorization: headers.has('authorization') })}\n`);
+    if (url.startsWith('https://api.github.com/')) return json({ object: { sha } }, scenario === 'main-error' ? 500 : 200);
+    if (url === 'https://sync.example.test/health') return new Response(scenario === 'health-body' ? 'NOT OK' : 'OK', { status: scenario === 'health-status' ? 503 : 200 });
+    if (url.endsWith('/activate')) {
+      if (scenario === 'activation-rejected') return json({}, 403);
+      activated = true;
+      return json({});
+    }
+    if (url.endsWith('/clone')) return json({ number: 2 });
+    if (url.endsWith('/validate')) return json({ status: 'ok' });
+    if (url.endsWith('/resource')) return json(Object.entries(resources).map(([name, resource_id]) => ({ name, resource_id })));
+    if (url.endsWith('/domain')) return json([{ name: 'sync.example.test' }]);
+    if (url.endsWith('/package')) return json({});
+    if (url.endsWith('/version/2')) { comment = options.body.get('comment'); return json({}); }
+    if (url.endsWith('/version')) return json([{ number: activated ? 2 : 1, active: true, comment: activated ? comment : '' }]);
+    return json({ customer_id: 'account-id' });
+  };
+}
+
+async function runMain(scenario) {
+  const directory = await mkdtemp(join(tmpdir(), 'divine-name-sync-deploy-'));
+  try {
+    await mkdir(join(directory, 'pkg'));
+    await writeFile(join(directory, 'pkg/divine-name-sync.tar.gz'), 'package');
+    await writeFile(join(directory, 'stub.mjs'), `import { appendFileSync } from 'node:fs';\n(${stubNetwork})(appendFileSync, ${JSON.stringify(scenario)}, ${JSON.stringify(sha)}, ${JSON.stringify(resources)});\n`);
+    const run = spawnSync(process.execPath, ['--import', pathToFileURL(join(directory, 'stub.mjs')).href, fileURLToPath(new URL('../scripts/deploy.mjs', import.meta.url))], {
+      cwd: directory, encoding: 'utf8', env: environment(),
+    });
+    const read = name => readFile(join(directory, name), 'utf8').catch(() => '');
+    const receipt = await read('deployment.json');
+    const calls = (await read('calls.jsonl')).split('\n').filter(Boolean).map(line => JSON.parse(line));
+    return { status: run.status, stderr: run.stderr, receipt: receipt && JSON.parse(receipt), calls };
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+test('production adapters send each credential only to its API and verify health', async () => {
+  const { status, receipt, calls } = await runMain('success');
+  assert.equal(status, 0);
+  assert.equal(receipt.result, 'success');
+  for (const call of calls) {
+    assert.equal(call.fastlyKey, call.url.startsWith('https://api.fastly.com/'));
+    assert.equal(call.authorization, call.url.startsWith('https://api.github.com/'));
+  }
+  assert.deepEqual(calls.find(call => call.url.endsWith('/package')).form, ['package']);
+  assert.equal(calls.find(call => call.url === 'https://sync.example.test/health').redirect, 'error');
+});
+
+for (const [scenario, activation] of [['health-status', 'confirmed'], ['health-body', 'confirmed'], ['activation-rejected', 'unknown']]) {
+  test(`production adapters fail on ${scenario}`, async () => {
+    const { status, receipt } = await runMain(scenario);
+    assert.equal(status, 1);
+    assert.equal(receipt.result, 'failure');
+    assert.equal(receipt.activation_status, activation);
+    assert.equal(receipt.activated, activation === 'confirmed');
+  });
+}
+
+test('production adapters stop before Fastly when main cannot be verified', async () => {
+  const { status, stderr, receipt, calls } = await runMain('main-error');
+  assert.equal(status, 1);
+  assert.match(stderr, /Cannot verify main \(500\)/);
+  assert.equal(receipt, '');
+  assert.equal(calls.some(call => call.url.startsWith('https://api.fastly.com/')), false);
+});
