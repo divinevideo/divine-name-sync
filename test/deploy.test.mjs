@@ -92,9 +92,11 @@ test('deployment service matches the manifest', async () => {
 
 test('workflow pins its actions and keeps the production job guarded, queued and receipted', async () => {
   const workflow = await readFile(new URL('../.github/workflows/compute.yml', import.meta.url), 'utf8');
-  const actions = [...workflow.matchAll(/^\s*(?:- )?uses: ([^\s@]+)@(\S+)/gm)];
-  assert.ok(actions.length > 0);
-  for (const [, action, ref] of actions) assert.match(ref, /^[0-9a-f]{40}$/, action);
+  const uses = workflow.match(/^[ \t]*(?:- )?uses:.*$/gm) ?? [];
+  assert.ok(uses.length > 0);
+  for (const line of uses) {
+    assert.match(line, /uses:\s+["']?(?:\.\/\S+|[^\s@"']+@[0-9a-f]{40}|docker:\/\/[^\s@"']+@sha256:[0-9a-f]{64})["']?(?:\s+#.*)?$/, line);
+  }
   const [job] = workflow.match(/^ {2}deploy:\n(?: {4,}.*\n|\s*#.*\n|\n)*/m) ?? [''];
   for (const line of [
     '    needs: checks',
