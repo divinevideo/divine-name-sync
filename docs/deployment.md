@@ -15,12 +15,11 @@ create replacement resources, domains, runtime secrets or move traffic.
 
 Create or confirm the GitHub `production` environment, including its intended
 reviewer protections and main-only deployment branch policy. An environment
-name in YAML is not proof of a protection rule: if `production` does not exist
-when the deploy job first runs, GitHub creates it with no protection rules.
-Create and protect it before the first `main` push that runs this workflow.
-Keep the enable flag unset
-until these prerequisites are verified. This change does not configure GitHub
-environments or their protections.
+name in YAML is not proof of a protection rule. Keep the enable flag unset
+until these prerequisites are verified. This change configures no environments
+or protections. If `production` does not exist when the deploy job first runs,
+GitHub creates it empty, with no protection rules or secrets; protect it before
+adding the token or variables below.
 
 Set these **production environment variables**, after recording the evidence:
 
