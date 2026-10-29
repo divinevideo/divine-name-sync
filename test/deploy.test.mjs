@@ -90,9 +90,12 @@ test('deployment service matches the manifest', async () => {
   assert.equal(manifest.match(/^service_id = "([^"]+)"/m)?.[1], SERVICE_ID);
 });
 
-test('workflow keeps the production job guarded, queued and receipted', async () => {
+test('workflow pins its actions and keeps the production job guarded, queued and receipted', async () => {
   const workflow = await readFile(new URL('../.github/workflows/compute.yml', import.meta.url), 'utf8');
-  const [job] = workflow.match(/^ {2}deploy:\n(?: {4,}.*\n|\n)*/m) ?? [''];
+  const actions = [...workflow.matchAll(/^\s*(?:- )?uses: ([^\s@]+)@(\S+)/gm)];
+  assert.ok(actions.length > 0);
+  for (const [, action, ref] of actions) assert.match(ref, /^[0-9a-f]{40}$/, action);
+  const [job] = workflow.match(/^ {2}deploy:\n(?: {4,}.*\n|\s*#.*\n|\n)*/m) ?? [''];
   for (const line of [
     '    needs: checks',
     "    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')",
