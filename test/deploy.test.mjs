@@ -198,6 +198,10 @@ for (const fault of ['account', 'binding', 'domain', 'validation', 'upload', 'ac
       assert.equal(records.at(-1).activated, true);
       assert.equal(records.at(-1).activation_status, 'confirmed');
     }
+    if (['account', 'binding', 'domain'].includes(fault)) {
+      assert.deepEqual(records, []);
+      assert.equal(calls.some(call => call.method !== 'GET'), false);
+    }
     if (['account', 'binding', 'domain', 'validation', 'upload'].includes(fault)) {
       assert.equal(calls.some(call => call.path.endsWith('/activate')), false);
     }
