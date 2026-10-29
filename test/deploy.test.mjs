@@ -149,7 +149,7 @@ for (const fault of ['account', 'binding', 'domain', 'validation', 'upload', 'ac
       if (fault === 'validation' && path.endsWith('/validate')) return { status: 'error' };
       if (fault === 'activation' && path.endsWith('/activate')) throw new Error('activation failed');
       const value = await original(path, options);
-      if (fault === 'active-version' && path.endsWith('/version') && value[0].number === 2) return [{ number: 3, active: true }];
+      if (fault === 'active-version' && path.endsWith('/version') && value[0].number === 2) return [{ number: 3, active: true, comment: `source:${sha}` }];
       return value;
     };
     if (fault === 'upload') dependencies.upload = async () => { throw new Error('upload failed'); };
