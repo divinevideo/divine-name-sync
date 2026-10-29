@@ -66,6 +66,8 @@ test('deploy clones active bindings, uploads checked package, validates, activat
   assert.ok(calls.some(call => call.path.endsWith('/version/1/clone') && call.method === 'PUT'));
   const commentUpdate = calls.find(call => call.path.endsWith('/version/2') && call.method === 'PUT');
   assert.equal(new URLSearchParams(commentUpdate.body).get('comment'), `source:${sha}`);
+  assert.ok(calls.some(call => call.path.endsWith('/version/2/package') && call.method === 'UPLOAD'));
+  assert.ok(calls.some(call => call.path.endsWith('/version/2/validate')));
   assert.ok(calls.findIndex(call => call.method === 'UPLOAD') < calls.findIndex(call => call.path.endsWith('/activate')));
   assert.equal(calls.at(-1).method, 'HEALTH');
 });
