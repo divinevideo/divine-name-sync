@@ -83,7 +83,7 @@ async function main() {
   const config = configuration(process.env);
   const api = async (path, options = {}) => {
     const response = await fetch(`https://api.fastly.com${path}`, {
-      ...options, headers: { 'Fastly-Key': process.env.FASTLY_API_TOKEN, Accept: 'application/json' }, signal: AbortSignal.timeout(60_000),
+      ...options, redirect: 'error', headers: { 'Fastly-Key': process.env.FASTLY_API_TOKEN, Accept: 'application/json' }, signal: AbortSignal.timeout(60_000),
     });
     if (!response.ok) throw new Error(`Fastly request failed (${response.status})`);
     return response.json();
@@ -106,7 +106,11 @@ async function main() {
       const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000) });
       if (response.status !== 200 || await response.text() !== 'OK') throw new Error('Production health verification failed');
     },
-    record: result => writeFile('deployment.json', `${JSON.stringify(result, null, 2)}\n`),
+    record: async result => {
+      const receipt = JSON.stringify(result, null, 2);
+      await writeFile('deployment.json', `${receipt}\n`);
+      console.log(receipt);
+    },
   });
   if (process.env.GITHUB_STEP_SUMMARY) {
     await writeFile(process.env.GITHUB_STEP_SUMMARY, `Production: ${result.result}\n\nSource: ${result.source_sha}\n\nFastly version: ${result.provider_version}\n\nPrevious version: ${result.previous_version}\n`);

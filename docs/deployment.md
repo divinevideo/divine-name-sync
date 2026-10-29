@@ -5,6 +5,9 @@ or an explicit **Run workflow** with branch **main** can enter the production
 job. `npm test` and `fastly compute build` must pass in that run. The deploy job
 downloads that run's SHA-named package; it never rebuilds it with credentials.
 Actions are pinned by commit, Node by release, and Fastly CLI/Viceroy by release.
+The build installs wasm-tools 1.262.0 with a fixed SHA-256 before Fastly runs,
+so Fastly's package metadata annotation uses that binary rather than fetching
+the latest wasm-tools release. Setup release lookups use the read-only GitHub token.
 
 ## Enablement prerequisites (maintainer-owned)
 
@@ -30,11 +33,16 @@ Set these **production environment variables**, after recording the evidence:
 | `FASTLY_RESOURCE_IDS` | JSON object with keys `divine-names`, `sync-failures`, `divine-name-sync-secrets`, each mapped to its existing resource ID |
 | `PRODUCTION_HEALTH_URL` | Confirmed service hostname, HTTPS `/health`, no credentials, query or redirect |
 
-Set the environment secret `FASTLY_API_TOKEN` using the approved credential
+Set the environment secret `FASTLY_PRODUCTION_DEPLOY_TOKEN` using the approved credential
 process. Use an automation token restricted to this existing service, with
 Fastly `global` scope for service version clone/update, package upload,
 validation and activation. `global:read` cannot deploy. Do not supply a personal
-account-wide token. Existing webhook secrets stay in Fastly's existing secret
+account-wide token. Reserve this secret name for the protected `production`
+environment: do not also define it at repository or organization scope. The
+workflow maps it to the CLI-compatible `FASTLY_API_TOKEN` process variable;
+it does not reference the shared `FASTLY_API_TOKEN` Actions secret. A missing
+production-specific secret fails the existing prerequisite check rather than
+falling back to that shared name. Existing webhook secrets stay in Fastly's existing secret
 store: CD does not read their values. GitHub's token only needs `contents: read`.
 
 Before its first provider write, the script checks the account, active version,
@@ -43,6 +51,12 @@ and uploads the checked package through Fastly's
 [package API](https://www.fastly.com/documentation/reference/api/services/package/).
 It never calls resource creation, domain mutation or secret APIs. After provider
 validation it rechecks the main tip and unchanged active version, then activates.
+The hostname check currently supports an exact classic domain entry on the
+active service version only. A maintainer must confirm this before enablement;
+versionless Domain Management or wildcard-only hosts are refused safely before
+any write. Do not move traffic or add a replacement domain to satisfy this guard.
+If the intended serving hostname uses either model, add and review support for
+that existing link before enabling the lane.
 
 ## Ordering and release evidence
 
@@ -56,7 +70,9 @@ A running older deployment may finish before the newer one; queued older work
 cannot overwrite a newer successful main release. Coordinate all manual provider
 changes with this same production lane; external actors are not locked by
 GitHub concurrency. A main push after the final check can leave production
-temporarily behind until its own checked run deploys.
+behind until its own checked run deploys. A CI skip marker or a push using
+`GITHUB_TOKEN` can prevent that run entirely; replay the current main manually
+instead of waiting for a run that was never created.
 
 `deployment.json` records source SHA, environment, service, previous version,
 new provider version and success/failure after provider preflight. `activated`
@@ -69,6 +85,10 @@ These fields separate pre-activation failures from a failed verification after
 activation. The receipt is retained
 as a run artifact, including after upload/validation/activation/health failures.
 Failures before preflight remain failed step logs with no deployment receipt.
+Each recorded receipt is also printed to the job log, preserving the previous
+version evidence in earlier attempt logs even if a later **Re-run all jobs**
+makes earlier artifacts inaccessible. Prefer **Re-run failed jobs**, and retain
+the previous attempt's receipt before replaying after an activation failure.
 The provider version comment also records `source:<full SHA>`. A success requires
 that exact version/comment to be active and a read-only `/health` response of
 HTTP 200 with body `OK`. No webhook smoke request or KV write is sent. The health

@@ -108,6 +108,13 @@ test('workflow pins its actions and keeps the production job guarded, queued and
   ]) assert.ok(job.includes(`\n${line}\n`), line);
   const receipt = job.split(/\n {6}- /).find(step => step.includes('path: deployment.json'));
   assert.match(receipt ?? '', /\n {8}if: always\(\)\n/);
+  assert.ok(job.includes('FASTLY_API_TOKEN: ${{ secrets.FASTLY_PRODUCTION_DEPLOY_TOKEN }}'));
+  assert.equal(job.includes('secrets.FASTLY_API_TOKEN'), false);
+  const pin = workflow.indexOf('name: Install pinned wasm-tools');
+  assert.ok(pin > 0 && pin < workflow.indexOf('- run: fastly compute build'));
+  assert.ok(workflow.includes('wasm-tools/releases/download/v1.262.0/wasm-tools-1.262.0-x86_64-linux.tar.gz'));
+  assert.ok(workflow.includes('655b8df67d54c3ef9b52fc237c4e94bbfbb5f5f43825245cb0940a7002a9ed65  wasm-tools.tar.gz'));
+  assert.ok(workflow.includes('sha256sum --check --strict'));
 });
 
 test('clone follows the observed active version rather than a fixed version', async () => {
@@ -254,20 +261,23 @@ async function runMain(scenario) {
     const read = name => readFile(join(directory, name), 'utf8').catch(() => '');
     const receipt = await read('deployment.json');
     const calls = (await read('calls.jsonl')).split('\n').filter(Boolean).map(line => JSON.parse(line));
-    return { status: run.status, stderr: run.stderr, receipt: receipt && JSON.parse(receipt), calls };
+    return { status: run.status, stdout: run.stdout, stderr: run.stderr, receipt: receipt && JSON.parse(receipt), calls };
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 }
 
 test('production adapters attach each credential only to its own API and verify health', async () => {
-  const { status, stderr, receipt, calls } = await runMain('success');
+  const { status, stdout, stderr, receipt, calls } = await runMain('success');
   assert.equal(status, 0, stderr);
   assert.equal(receipt.result, 'success');
   for (const call of calls) {
     assert.equal(call.fastlyKey, call.url.startsWith('https://api.fastly.com/'));
     assert.equal(call.authorization, call.url.startsWith('https://api.github.com/'));
+    if (call.fastlyKey) assert.equal(call.redirect, 'error');
   }
+  assert.ok(stdout.includes('"previous_version": 1'));
+  assert.ok(stdout.includes('"result": "success"'));
   assert.deepEqual(calls.find(call => call.url.endsWith('/package')).form, ['package']);
   assert.deepEqual(['/clone', '/version/2', '/package', '/activate'].map(suffix => calls.find(call => call.url.endsWith(suffix)).method), ['PUT', 'PUT', 'PUT', 'PUT']);
   assert.equal(calls.find(call => call.url === 'https://sync.example.test/health').redirect, 'error');
@@ -275,9 +285,10 @@ test('production adapters attach each credential only to its own API and verify 
 
 for (const [scenario, activation] of [['health-status', 'confirmed'], ['health-body', 'confirmed'], ['activation-rejected', 'unknown']]) {
   test(`production adapters fail on ${scenario}`, async () => {
-    const { status, stderr, receipt } = await runMain(scenario);
+    const { status, stdout, stderr, receipt } = await runMain(scenario);
     assert.equal(status, 1, stderr);
     assert.equal(receipt.result, 'failure');
+    assert.ok(stdout.includes('"result": "failure"'));
     assert.equal(receipt.activation_status, activation);
     assert.equal(receipt.activated, activation === 'confirmed');
   });
