@@ -209,8 +209,9 @@ function stubNetwork(appendFileSync, scenario, sha, resources) {
     const url = String(input);
     const headers = new Headers(options.headers);
     const form = options.body instanceof FormData ? [...options.body.keys()] : undefined;
-    appendFileSync('calls.jsonl', `${JSON.stringify({ url, redirect: options.redirect, form, fastlyKey: headers.has('fastly-key'), authorization: headers.has('authorization') })}\n`);
-    if (url.startsWith('https://api.github.com/')) return json({ object: { sha } }, scenario === 'main-error' ? 500 : 200);
+    appendFileSync('calls.jsonl', `${JSON.stringify({ url, method: options.method ?? 'GET', redirect: options.redirect, form, fastlyKey: headers.has('fastly-key'), authorization: headers.has('authorization') })}\n`);
+    if (url === 'https://api.github.com/repos/example/sync/git/ref/heads/main') return json({ object: { sha } }, scenario === 'main-error' ? 500 : 200);
+    if (url.startsWith('https://api.github.com/')) return json({}, 404);
     if (url === 'https://sync.example.test/health') return new Response(scenario === 'health-body' ? 'NOT OK' : 'OK', { status: scenario === 'health-status' ? 503 : 200 });
     if (url.endsWith('/activate')) {
       if (scenario === 'activation-rejected') return json({}, 403);
@@ -235,7 +236,7 @@ async function runMain(scenario) {
     await writeFile(join(directory, 'pkg/divine-name-sync.tar.gz'), 'package');
     await writeFile(join(directory, 'stub.mjs'), `import { appendFileSync } from 'node:fs';\n(${stubNetwork})(appendFileSync, ${JSON.stringify(scenario)}, ${JSON.stringify(sha)}, ${JSON.stringify(resources)});\n`);
     const run = spawnSync(process.execPath, ['--import', pathToFileURL(join(directory, 'stub.mjs')).href, fileURLToPath(new URL('../scripts/deploy.mjs', import.meta.url))], {
-      cwd: directory, encoding: 'utf8', env: environment(),
+      cwd: directory, encoding: 'utf8', env: environment(), timeout: 30_000,
     });
     const read = name => readFile(join(directory, name), 'utf8').catch(() => '');
     const receipt = await read('deployment.json');
@@ -246,22 +247,23 @@ async function runMain(scenario) {
   }
 }
 
-test('production adapters send each credential only to its API and verify health', async () => {
-  const { status, receipt, calls } = await runMain('success');
-  assert.equal(status, 0);
+test('production adapters attach each credential only to its own API and verify health', async () => {
+  const { status, stderr, receipt, calls } = await runMain('success');
+  assert.equal(status, 0, stderr);
   assert.equal(receipt.result, 'success');
   for (const call of calls) {
     assert.equal(call.fastlyKey, call.url.startsWith('https://api.fastly.com/'));
     assert.equal(call.authorization, call.url.startsWith('https://api.github.com/'));
   }
   assert.deepEqual(calls.find(call => call.url.endsWith('/package')).form, ['package']);
+  assert.deepEqual(['/clone', '/version/2', '/package', '/activate'].map(suffix => calls.find(call => call.url.endsWith(suffix)).method), ['PUT', 'PUT', 'PUT', 'PUT']);
   assert.equal(calls.find(call => call.url === 'https://sync.example.test/health').redirect, 'error');
 });
 
 for (const [scenario, activation] of [['health-status', 'confirmed'], ['health-body', 'confirmed'], ['activation-rejected', 'unknown']]) {
   test(`production adapters fail on ${scenario}`, async () => {
-    const { status, receipt } = await runMain(scenario);
-    assert.equal(status, 1);
+    const { status, stderr, receipt } = await runMain(scenario);
+    assert.equal(status, 1, stderr);
     assert.equal(receipt.result, 'failure');
     assert.equal(receipt.activation_status, activation);
     assert.equal(receipt.activated, activation === 'confirmed');
