@@ -113,8 +113,7 @@ test('workflow pins its actions and keeps the production job guarded, queued and
   const pin = workflow.indexOf('name: Install pinned wasm-tools');
   assert.ok(pin > 0 && pin < workflow.indexOf('- run: fastly compute build'));
   assert.ok(workflow.includes('wasm-tools/releases/download/v1.262.0/wasm-tools-1.262.0-x86_64-linux.tar.gz'));
-  assert.ok(workflow.includes('655b8df67d54c3ef9b52fc237c4e94bbfbb5f5f43825245cb0940a7002a9ed65  wasm-tools.tar.gz'));
-  assert.ok(workflow.includes('sha256sum --check --strict'));
+  assert.ok(workflow.includes("\n          echo '655b8df67d54c3ef9b52fc237c4e94bbfbb5f5f43825245cb0940a7002a9ed65  wasm-tools.tar.gz' | sha256sum --check --strict\n"));
 });
 
 test('clone follows the observed active version rather than a fixed version', async () => {
