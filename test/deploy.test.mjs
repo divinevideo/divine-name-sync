@@ -19,21 +19,25 @@ const environment = () => ({
 test('configuration accepts only enabled main push or main manual replay', () => {
   assert.equal(configuration(environment()).sha, sha);
   assert.equal(configuration({ ...environment(), GITHUB_EVENT_NAME: 'workflow_dispatch' }).sha, sha);
-  for (const change of [
-    { GITHUB_REF: 'refs/heads/feature' }, { GITHUB_EVENT_NAME: 'pull_request' },
-    { CD_ENABLED: '' }, { CD_ENABLED: 'false' }, { CD_ENABLED: 'TRUE' },
-    { FASTLY_API_TOKEN: '' }, { FASTLY_CUSTOMER_ID: '' }, { GITHUB_TOKEN: '' }, { GITHUB_REPOSITORY: '' },
-    { GITHUB_SHA: '' }, { GITHUB_SHA: 'a'.repeat(39) },
-    { FASTLY_RESOURCE_IDS: '{}' }, { FASTLY_RESOURCE_IDS: JSON.stringify({ ...resources, extra: 'extra-id' }) },
-    { FASTLY_RESOURCE_IDS: JSON.stringify({ ...resources, 'divine-names': 1 }) },
-    { PRODUCTION_HEALTH_URL: 'http://sync.example.test/health' },
-    { PRODUCTION_HEALTH_URL: 'https://sync.example.test/sync' },
-    { PRODUCTION_HEALTH_URL: 'https://sync.example.test/health?extra=1' },
-    { PRODUCTION_HEALTH_URL: 'https://sync.example.test/health#frag' },
-    { PRODUCTION_HEALTH_URL: 'https://sync.example.test:8443/health' },
-    { PRODUCTION_HEALTH_URL: 'https://user:pass@sync.example.test/health' },
-    { PRODUCTION_HEALTH_URL: 'https://:pass@sync.example.test/health' },
-  ]) assert.throws(() => configuration({ ...environment(), ...change }));
+  for (const [pattern, changes] of [
+    [/push or manual replay on main/, [{ GITHUB_REF: 'refs/heads/feature' }, { GITHUB_EVENT_NAME: 'pull_request' }]],
+    [/not been confirmed/, [{ CD_ENABLED: '' }, { CD_ENABLED: 'false' }, { CD_ENABLED: 'TRUE' }]],
+    [/source SHA/, [{ GITHUB_SHA: '' }, { GITHUB_SHA: 'a'.repeat(39) }]],
+    [/deployment prerequisites/, [{ FASTLY_API_TOKEN: '' }, { FASTLY_CUSTOMER_ID: '' }, { GITHUB_TOKEN: '' }, { GITHUB_REPOSITORY: '' }]],
+    [/plain HTTPS \/health/, [
+      { PRODUCTION_HEALTH_URL: 'http://sync.example.test/health' },
+      { PRODUCTION_HEALTH_URL: 'https://sync.example.test/sync' },
+      { PRODUCTION_HEALTH_URL: 'https://sync.example.test/health?extra=1' },
+      { PRODUCTION_HEALTH_URL: 'https://sync.example.test/health#frag' },
+      { PRODUCTION_HEALTH_URL: 'https://sync.example.test:8443/health' },
+      { PRODUCTION_HEALTH_URL: 'https://user:pass@sync.example.test/health' },
+      { PRODUCTION_HEALTH_URL: 'https://:pass@sync.example.test/health' },
+    ]],
+    [/three existing resource IDs/, [
+      { FASTLY_RESOURCE_IDS: '{}' }, { FASTLY_RESOURCE_IDS: JSON.stringify({ ...resources, extra: 'extra-id' }) },
+      { FASTLY_RESOURCE_IDS: JSON.stringify({ ...resources, 'divine-names': 1 }) },
+    ]],
+  ]) for (const change of changes) assert.throws(() => configuration({ ...environment(), ...change }), pattern, JSON.stringify(change));
 });
 
 function fixture(overrides = {}) {
