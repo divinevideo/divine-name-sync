@@ -119,6 +119,12 @@ The service is configured through Fastly resources rather than environment varia
 
 ## Deployment
 
+For checked main-branch deployment, prerequisites, release evidence and rollback,
+see [the deployment guide](docs/deployment.md). Automation stays disabled until
+a maintainer verifies the existing production resources and protections.
+
+The following is the original manual provisioning flow, not a CD setup step:
+
 1. Create the Fastly Compute service.
 2. Create the `divine-name-sync-secrets` secret store and add `webhook_secret` (must match the name server's shared secret).
 3. Link the existing `divine-names` KV store.
