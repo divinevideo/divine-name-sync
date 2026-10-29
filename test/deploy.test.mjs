@@ -108,8 +108,8 @@ test('workflow pins its actions and keeps the production job guarded, queued and
   ]) assert.ok(job.includes(`\n${line}\n`), line);
   const receipt = job.split(/\n {6}- /).find(step => step.includes('path: deployment.json'));
   assert.match(receipt ?? '', /\n {8}if: always\(\)\n/);
-  assert.ok(job.includes('FASTLY_API_TOKEN: ${{ secrets.FASTLY_PRODUCTION_DEPLOY_TOKEN }}'));
-  assert.equal(job.includes('secrets.FASTLY_API_TOKEN'), false);
+  assert.match(job, /^ {10}FASTLY_API_TOKEN: \$\{\{ secrets\.FASTLY_PRODUCTION_DEPLOY_TOKEN \}\}$/m);
+  assert.doesNotMatch(workflow, /secrets\s*(?:\.\s*fastly_api_token\b|\[\s*['"]fastly_api_token['"]\s*\])/i);
   const setup = workflow.split(/\n {6}- /).find(step => step.startsWith('uses: fastly/compute-actions/setup@'));
   assert.match(setup ?? '', /\n {10}token: \$\{\{ github\.token \}\}(?:\n|$)/);
   const pin = workflow.indexOf('name: Install pinned wasm-tools');
