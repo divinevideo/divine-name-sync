@@ -21,5 +21,8 @@
   "license": "MIT",
   "devDependencies": {
     "@fastly/js-compute": "4.4.0"
+  },
+  "overrides": {
+    "@bytecodealliance/jco": "1.17.9"
   }
 }
