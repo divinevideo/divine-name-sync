@@ -47,6 +47,8 @@ jobs:
       - run: fastly compute build --non-interactive
       - name: Check the build used the pinned weval
         run: test -z "$(find node_modules/@bytecodealliance/weval -name weval -type f)"
+      - name: Smoke-test the built package in Viceroy
+        run: node --test test/compute.smoke.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: compute-${{ github.sha }}

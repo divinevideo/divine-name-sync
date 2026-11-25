@@ -2,7 +2,8 @@
 
 The `Compute` workflow checks PRs and pushes to `main`. Only a push to `main`
 or an explicit **Run workflow** with branch **main** can enter the production
-job. `npm test` and `fastly compute build` must pass in that run. The deploy job
+job. `npm test`, `fastly compute build` and a Viceroy smoke test of the built
+package must pass in that run. The deploy job
 downloads that run's SHA-named package; it never rebuilds it with credentials.
 Actions are pinned by commit, Node by release, and Fastly CLI/Viceroy by release.
 The build installs wasm-tools 1.262.0 with a fixed SHA-256 before Fastly runs,
@@ -97,7 +98,11 @@ the previous attempt's receipt before replaying after an activation failure.
 The provider version comment also records `source:<full SHA>`. A success requires
 that exact version/comment to be active and a read-only `/health` response of
 HTTP 200 with body `OK`. No webhook smoke request or KV write is sent. The health
-probe establishes availability, not end-to-end webhook or KV correctness.
+probe establishes availability, not end-to-end webhook or KV correctness. That is
+checked before upload instead: the checks job serves the built package in Viceroy
+against temporary copies of the local test stores, with a throwaway secret, and
+sends it signed upsert, delete and wrong-secret webhooks
+(`test/compute.smoke.mjs`). Nothing in that test reaches Fastly.
 
 For a controlled first merge, the maintainer must inspect check execution,
 production environment authorization, the deployment artifact, active version

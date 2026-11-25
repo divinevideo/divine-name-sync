@@ -165,6 +165,16 @@ test('checks install dependencies without running install scripts', async () => 
   assert.ok(!steps.some(step => /^run: npm (?:ci|install)(?! --ignore-scripts)/.test(step)));
 });
 
+test('checks smoke-test the compiled package before uploading it', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/compute.yml', import.meta.url), 'utf8');
+  const steps = workflow.split(/\n {6}- /);
+  // The unit tests run the source in Node; only this step runs the compiled module that ships.
+  assert.ok(steps.includes('name: Smoke-test the built package in Viceroy\n        run: node --test test/compute.smoke.mjs'));
+  const order = ['run: fastly compute build --non-interactive', 'name: Smoke-test the built package in Viceroy', 'uses: actions/upload-artifact@']
+    .map(prefix => steps.findIndex(step => step.startsWith(prefix)));
+  assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `step order ${order}`);
+});
+
 test('clone follows the observed active version rather than a fixed version', async () => {
   const { dependencies, calls } = fixture();
   const original = dependencies.api;
