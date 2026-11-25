@@ -145,15 +145,19 @@ test('checks compile with a checksum-verified weval and fail if the build fetche
   ].join('\n'));
   assert.equal(steps.find(step => step.startsWith('name: Check the build used the pinned weval')), [
     'name: Check the build used the pinned weval',
-    '        run: test -z "$(find node_modules/@bytecodealliance/weval -name weval -type f)"',
+    // Every installed copy of the weval package, including one nested under js-compute.
+    `        run: test -z "$(find node_modules -path '*/@bytecodealliance/weval/*' -name weval -type f)"`,
   ].join('\n'));
   const order = ['name: Install pinned weval', 'run: fastly compute build --non-interactive', 'name: Check the build used the pinned weval', 'uses: actions/upload-artifact@']
     .map(prefix => steps.findIndex(step => step.startsWith(prefix)));
   assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `step order ${order}`);
   // js-compute's ahead-of-time cache is built for the weval version it depends on, so a
   // dependency update that moves weval must move this pin (URL and digest) with it.
+  // Resolve weval the way js-compute does: its own nested copy first, then the top-level one.
   const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
-  assert.equal(lock.packages['node_modules/@bytecodealliance/weval'].version, '0.5.1');
+  const weval = lock.packages['node_modules/@fastly/js-compute/node_modules/@bytecodealliance/weval']
+    ?? lock.packages['node_modules/@bytecodealliance/weval'];
+  assert.equal(weval?.version, '0.5.1');
 });
 
 test('checks install dependencies without running install scripts', async () => {

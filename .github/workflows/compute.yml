@@ -46,7 +46,7 @@ jobs:
           printf '{"wevalBin":"%s"}\n' "$RUNNER_TEMP/weval-v0.5.1-x86_64-linux/weval" > "$GITHUB_WORKSPACE/.fastlycomputerc.json"
       - run: fastly compute build --non-interactive
       - name: Check the build used the pinned weval
-        run: test -z "$(find node_modules/@bytecodealliance/weval -name weval -type f)"
+        run: test -z "$(find node_modules -path '*/@bytecodealliance/weval/*' -name weval -type f)"
       - name: Smoke-test the built package in Viceroy
         run: node --test test/compute.smoke.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
