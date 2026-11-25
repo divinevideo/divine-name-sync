@@ -77,6 +77,8 @@ Missing headers, stale timestamps, and bad signatures all return `401`; malforme
 
 Requires the [Fastly CLI](https://www.fastly.com/documentation/reference/cli/) and Node.js 22.20+ (22.x), 24.12+ (24.x) or 25+. On older Node versions the install only prints a warning, but every build then fails with `Cannot find native binding`: a compression library used by the build ships native code only for those versions.
 
+Clone into a path with no spaces. As of `@fastly/js-compute` 4.4.0, the ahead-of-time build passes its cache path to a shell unquoted, so a space anywhere in the checkout path makes `npm run build`, `npm run dev` and `npm run deploy` fail with `Weval initialization failure`.
+
 ```bash
 # Install dependencies. --ignore-scripts skips a wasmtime download that
 # the default (ahead-of-time) build never uses.
