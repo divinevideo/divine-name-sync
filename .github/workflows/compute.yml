@@ -35,7 +35,18 @@ jobs:
           tar -xzf wasm-tools.tar.gz
           echo "$RUNNER_TEMP/wasm-tools-1.262.0-x86_64-linux" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/wasm-tools-1.262.0-x86_64-linux/wasm-tools" --version
+      - name: Install pinned weval
+        run: |
+          cd "$RUNNER_TEMP"
+          curl --fail --location --retry 3 https://github.com/bytecodealliance/weval/releases/download/v0.5.1/weval-v0.5.1-x86_64-linux.tar.xz -o weval.tar.xz
+          echo 'ed36a23a4e7f5fdd72659c68647427ab9aee137278e2439bddd813de7db1e2c8  weval.tar.xz' | sha256sum --check --strict
+          tar -xJf weval.tar.xz
+          "$RUNNER_TEMP/weval-v0.5.1-x86_64-linux/weval" --version
+          # js-compute reads its weval path from this file in the project root.
+          printf '{"wevalBin":"%s"}\n' "$RUNNER_TEMP/weval-v0.5.1-x86_64-linux/weval" > "$GITHUB_WORKSPACE/.fastlycomputerc.json"
       - run: fastly compute build --non-interactive
+      - name: Check the build used the pinned weval
+        run: test -z "$(find node_modules/@bytecodealliance/weval -name weval -type f)"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: compute-${{ github.sha }}

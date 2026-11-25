@@ -128,6 +128,34 @@ test('workflow pins its actions and keeps the production job guarded, queued and
   ].join('\n'));
 });
 
+test('checks compile with a checksum-verified weval and fail if the build fetched its own', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/compute.yml', import.meta.url), 'utf8');
+  const steps = workflow.split(/\n {6}- /);
+  // js-compute 4 compiles ahead of time with weval. Given no binary, it downloads one with no checksum.
+  assert.equal(steps.find(step => step.startsWith('name: Install pinned weval')), [
+    'name: Install pinned weval',
+    '        run: |',
+    '          cd "$RUNNER_TEMP"',
+    '          curl --fail --location --retry 3 https://github.com/bytecodealliance/weval/releases/download/v0.5.1/weval-v0.5.1-x86_64-linux.tar.xz -o weval.tar.xz',
+    "          echo 'ed36a23a4e7f5fdd72659c68647427ab9aee137278e2439bddd813de7db1e2c8  weval.tar.xz' | sha256sum --check --strict",
+    '          tar -xJf weval.tar.xz',
+    '          "$RUNNER_TEMP/weval-v0.5.1-x86_64-linux/weval" --version',
+    '          # js-compute reads its weval path from this file in the project root.',
+    `          printf '{"wevalBin":"%s"}\\n' "$RUNNER_TEMP/weval-v0.5.1-x86_64-linux/weval" > "$GITHUB_WORKSPACE/.fastlycomputerc.json"`,
+  ].join('\n'));
+  assert.equal(steps.find(step => step.startsWith('name: Check the build used the pinned weval')), [
+    'name: Check the build used the pinned weval',
+    '        run: test -z "$(find node_modules/@bytecodealliance/weval -name weval -type f)"',
+  ].join('\n'));
+  const order = ['name: Install pinned weval', 'run: fastly compute build --non-interactive', 'name: Check the build used the pinned weval', 'uses: actions/upload-artifact@']
+    .map(prefix => steps.findIndex(step => step.startsWith(prefix)));
+  assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `step order ${order}`);
+  // js-compute's ahead-of-time cache is built for the weval version it depends on, so a
+  // dependency update that moves weval must move this pin (URL and digest) with it.
+  const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
+  assert.equal(lock.packages['node_modules/@bytecodealliance/weval'].version, '0.5.1');
+});
+
 test('clone follows the observed active version rather than a fixed version', async () => {
   const { dependencies, calls } = fixture();
   const original = dependencies.api;

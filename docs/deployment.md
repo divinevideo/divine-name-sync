@@ -7,7 +7,12 @@ downloads that run's SHA-named package; it never rebuilds it with credentials.
 Actions are pinned by commit, Node by release, and Fastly CLI/Viceroy by release.
 The build installs wasm-tools 1.262.0 with a fixed SHA-256 before Fastly runs,
 so Fastly's package metadata annotation uses that binary rather than fetching
-the latest wasm-tools release. Setup release lookups use the read-only GitHub token.
+the latest wasm-tools release. It also installs weval 0.5.1 with a fixed SHA-256
+and points js-compute at it through `.fastlycomputerc.json`: js-compute 4
+compiles ahead of time with weval, and when it is not given a binary it
+downloads one with no checksum. A step after the build fails the run if
+js-compute fetched its own weval anyway. That file is written in CI only and is
+not part of the package. Setup release lookups use the read-only GitHub token.
 
 ## Enablement prerequisites (maintainer-owned)
 
