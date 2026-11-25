@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: '22.22.0'
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm test
       - uses: fastly/compute-actions/setup@9ca64d641e165464cd4c0c988f2e549dc7d43b49 # v13
         with:

@@ -78,8 +78,9 @@ Missing headers, stale timestamps, and bad signatures all return `401`; malforme
 Requires Node.js and the [Fastly CLI](https://www.fastly.com/documentation/reference/cli/).
 
 ```bash
-# Install dependencies
-npm install
+# Install dependencies. --ignore-scripts skips a wasmtime download that
+# the default (ahead-of-time) build never uses.
+npm install --ignore-scripts
 
 # Serve locally through Fastly Compute
 npm run dev

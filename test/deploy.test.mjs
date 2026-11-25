@@ -156,6 +156,15 @@ test('checks compile with a checksum-verified weval and fail if the build fetche
   assert.equal(lock.packages['node_modules/@bytecodealliance/weval'].version, '0.5.1');
 });
 
+test('checks install dependencies without running install scripts', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/compute.yml', import.meta.url), 'utf8');
+  const steps = workflow.split(/\n {6}- /);
+  // js-compute bundles a wasmtime whose postinstall downloads an unverified binary that the
+  // ahead-of-time build never runs. Running it also makes npm ci, and so the tests, depend on GitHub.
+  assert.ok(steps.includes('run: npm ci --ignore-scripts'));
+  assert.ok(!steps.some(step => /^run: npm (?:ci|install)(?! --ignore-scripts)/.test(step)));
+});
+
 test('clone follows the observed active version rather than a fixed version', async () => {
   const { dependencies, calls } = fixture();
   const original = dependencies.api;
