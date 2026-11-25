@@ -26,6 +26,8 @@
     "@fastly/js-compute": "4.4.0"
   },
   "overrides": {
-    "@bytecodealliance/jco": "1.17.9"
+    "@fastly/js-compute@4.4.0": {
+      "@bytecodealliance/jco": "1.17.9"
+    }
   }
 }
