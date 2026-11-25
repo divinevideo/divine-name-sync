@@ -8,6 +8,9 @@ pkg/
 # Local secrets (never commit)
 secrets.local.json
 
+# Machine-specific js-compute config, such as a local weval path (CI writes its own)
+.fastlycomputerc.json
+
 # Static publisher artifacts
 static-publisher/
 
