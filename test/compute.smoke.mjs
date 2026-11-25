@@ -49,7 +49,8 @@ before(async () => {
   for (const deadline = Date.now() + 60_000; Date.now() < deadline;) {
     if (spawnError) throw spawnError;
     if (viceroy.exitCode !== null) throw new Error(`viceroy exited with ${viceroy.exitCode}:\n${output}`);
-    const ready = await fetch(`${origin}/health`).then(response => response.ok, () => false);
+    // Each probe has its own timeout so one unanswered request cannot outlast the deadline.
+    const ready = await fetch(`${origin}/health`, { signal: AbortSignal.timeout(2_000) }).then(response => response.ok, () => false);
     if (ready) return;
     await new Promise(resolve => setTimeout(resolve, 250));
   }
@@ -71,11 +72,13 @@ async function sync(payload, key = secret) {
   const body = JSON.stringify(payload);
   const timestamp = String(Math.floor(Date.now() / 1000));
   const signature = createHmac('sha256', key).update(body + timestamp).digest('base64');
+  // A stuck handler must fail the run quickly, not hold it until fetch's own five-minute limit.
   return fetch(`${origin}/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Webhook-Timestamp': timestamp, 'X-Webhook-Signature': signature },
     body,
-  });
+    signal: AbortSignal.timeout(10_000),
+  }).catch(error => { throw new Error(`POST /sync got no response: ${error.message}\n${output}`); });
 }
 
 test('a signed upsert is verified and written to the names store', async () => {
