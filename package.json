@@ -20,6 +20,6 @@
   "author": "Divine <hello@divine.video>",
   "license": "MIT",
   "devDependencies": {
-    "@fastly/js-compute": "^3.38.2"
+    "@fastly/js-compute": "4.4.0"
   }
 }
