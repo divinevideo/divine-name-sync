@@ -12,8 +12,8 @@ the latest wasm-tools release. It also installs weval 0.5.1 with a fixed SHA-256
 and points js-compute at it through `.fastlycomputerc.json`: js-compute 4
 compiles ahead of time with weval, and when it is not given a binary it
 downloads one with no checksum. A step after the build fails the run if
-js-compute fetched its own weval anyway. That file is written in CI only and is
-not part of the package. Setup release lookups use the read-only GitHub token.
+js-compute fetched its own weval anyway. `.fastlycomputerc.json` is written in CI
+only and is not part of the package. Setup release lookups use the read-only GitHub token.
 
 ## Enablement prerequisites (maintainer-owned)
 
@@ -98,11 +98,20 @@ the previous attempt's receipt before replaying after an activation failure.
 The provider version comment also records `source:<full SHA>`. A success requires
 that exact version/comment to be active and a read-only `/health` response of
 HTTP 200 with body `OK`. No webhook smoke request or KV write is sent. The health
-probe establishes availability, not end-to-end webhook or KV correctness. That is
-checked before upload instead: the checks job serves the built package in Viceroy
-against temporary copies of the local test stores, with a throwaway secret, and
-sends it signed upsert, delete and wrong-secret webhooks
-(`test/compute.smoke.mjs`). Nothing in that test reaches Fastly.
+probe establishes availability, not end-to-end webhook or KV correctness.
+
+Before upload, the checks job runs the compiled package's webhook path locally
+(`test/compute.smoke.mjs`). It serves the built package in Viceroy against
+temporary copies of the local test stores, with a throwaway secret, and checks
+two things:
+- signed upsert and delete webhooks are accepted;
+- a webhook signed with the wrong secret is rejected.
+
+That catches a compiled module that fails at runtime or skips signature checks.
+It does not read stored values back. It says nothing about production store or
+secret wiring, which neither check covers. Nothing in the test reaches Fastly.
+Viceroy runs in the same job as the Fastly CLI that builds the package, and both
+are pinned by release.
 
 For a controlled first merge, the maintainer must inspect check execution,
 production environment authorization, the deployment artifact, active version

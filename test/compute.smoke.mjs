@@ -81,13 +81,13 @@ async function sync(payload, key = secret) {
   }).catch(error => { throw new Error(`POST /sync got no response: ${error.message}\n${output}`); });
 }
 
-test('a signed upsert is verified and written to the names store', async () => {
+test('a signed upsert is verified and accepted', async () => {
   const response = await sync({ name: 'Smoke', action: 'upsert', pubkey, relays: ['wss://relay.example.test'] });
   assert.equal(response.status, 200, output);
   assert.equal(await response.text(), 'OK');
 });
 
-test('a signed delete is verified and applied to the names store', async () => {
+test('a signed delete is verified and accepted', async () => {
   const response = await sync({ name: 'smoke', action: 'delete' });
   assert.equal(response.status, 200, output);
   assert.equal(await response.text(), 'OK');

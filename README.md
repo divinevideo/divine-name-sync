@@ -110,7 +110,7 @@ curl -X POST http://localhost:7676/sync \
 
 The local server reads sample KV and secret data from the paths configured in `fastly.toml` (`test-data/names.json`, `test-data/failures.json`, and `secrets.local.json`). `secrets.local.json` holds the local `webhook_secret` and is gitignored — create it yourself to exercise a passing signature check.
 
-To check the built package end to end, as CI does after each build, run `node --test test/compute.smoke.mjs` after `npm run build`. It needs [Viceroy](https://github.com/fastly/Viceroy) on your `PATH`. It serves `bin/main.wasm` from a temporary copy of the local stores with a throwaway secret, so it never touches your `secrets.local.json`.
+To check the built package end to end, as CI does after each build, run `node --test test/compute.smoke.mjs` after `npm run build`. It needs [Viceroy](https://github.com/fastly/Viceroy) on your `PATH`, or its path in a `VICEROY` environment variable. It serves `bin/main.wasm` from a temporary copy of the local stores with a throwaway secret, so it never touches your `secrets.local.json`.
 
 ## Configuration
 
