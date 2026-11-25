@@ -166,7 +166,8 @@ test('checks install dependencies without running install scripts', async () => 
   // js-compute bundles a wasmtime whose postinstall downloads an unverified binary that the
   // ahead-of-time build never runs. Running it also makes npm ci, and so the tests, depend on GitHub.
   assert.ok(steps.includes('run: npm ci --ignore-scripts'));
-  assert.ok(!steps.some(step => /^run: npm (?:ci|install)(?! --ignore-scripts)/.test(step)));
+  // Covers every install-like command anywhere in the workflow, in named steps and scripts too.
+  assert.doesNotMatch(workflow, /\bnpm (?:ci|install|i|rebuild)\b(?![^\n]*--ignore-scripts)/);
 });
 
 test('checks smoke-test the compiled package before uploading it', async () => {
@@ -177,6 +178,8 @@ test('checks smoke-test the compiled package before uploading it', async () => {
   const order = ['run: fastly compute build --non-interactive', 'name: Smoke-test the built package in Viceroy', 'uses: actions/upload-artifact@']
     .map(prefix => steps.findIndex(step => step.startsWith(prefix)));
   assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `step order ${order}`);
+  // A second build would replace the checked package before it is uploaded.
+  assert.equal(workflow.match(/fastly compute build/g)?.length, 1);
 });
 
 test('clone follows the observed active version rather than a fixed version', async () => {
