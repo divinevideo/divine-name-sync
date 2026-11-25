@@ -19,6 +19,9 @@
   ],
   "author": "Divine <hello@divine.video>",
   "license": "MIT",
+  "engines": {
+    "node": "^22.20 || ^24.12 || >=25"
+  },
   "devDependencies": {
     "@fastly/js-compute": "4.4.0"
   },

@@ -75,7 +75,7 @@ Missing headers, stale timestamps, and bad signatures all return `401`; malforme
 
 ## Getting started
 
-Requires Node.js and the [Fastly CLI](https://www.fastly.com/documentation/reference/cli/).
+Requires the [Fastly CLI](https://www.fastly.com/documentation/reference/cli/) and Node.js 22.20+ (22.x), 24.12+ (24.x) or 25+. On older Node versions the install only prints a warning, but every build then fails with `Cannot find native binding`: a compression library used by the build ships native code only for those versions.
 
 ```bash
 # Install dependencies. --ignore-scripts skips a wasmtime download that
