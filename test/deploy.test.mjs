@@ -166,7 +166,8 @@ test('checks install dependencies without running install scripts', async () => 
   // js-compute bundles a wasmtime whose postinstall downloads an unverified binary that the
   // ahead-of-time build never runs. Running it also makes npm ci, and so the tests, depend on GitHub.
   assert.ok(steps.includes('run: npm ci --ignore-scripts'));
-  // Covers every install-like command anywhere in the workflow, in named steps and scripts too.
+  // Catches npm ci, install, i and rebuild without --ignore-scripts anywhere in the workflow,
+  // named steps and scripts included. Other npm spellings and aliases still need a reviewer's eye.
   assert.doesNotMatch(workflow, /\bnpm (?:ci|install|i|rebuild)\b(?![^\n]*--ignore-scripts)/);
 });
 
