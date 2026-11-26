@@ -128,6 +128,61 @@ test('workflow pins its actions and keeps the production job guarded, queued and
   ].join('\n'));
 });
 
+test('checks compile with a checksum-verified weval and fail if the build fetched its own', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/compute.yml', import.meta.url), 'utf8');
+  const steps = workflow.split(/\n {6}- /);
+  // js-compute 4 compiles ahead of time with weval. Given no binary, it downloads one with no checksum.
+  assert.equal(steps.find(step => step.startsWith('name: Install pinned weval')), [
+    'name: Install pinned weval',
+    '        run: |',
+    '          cd "$RUNNER_TEMP"',
+    '          curl --fail --location --retry 3 https://github.com/bytecodealliance/weval/releases/download/v0.5.1/weval-v0.5.1-x86_64-linux.tar.xz -o weval.tar.xz',
+    "          echo 'ed36a23a4e7f5fdd72659c68647427ab9aee137278e2439bddd813de7db1e2c8  weval.tar.xz' | sha256sum --check --strict",
+    '          tar -xJf weval.tar.xz',
+    '          "$RUNNER_TEMP/weval-v0.5.1-x86_64-linux/weval" --version',
+    '          # js-compute reads its weval path from this file in the project root.',
+    `          printf '{"wevalBin":"%s"}\\n' "$RUNNER_TEMP/weval-v0.5.1-x86_64-linux/weval" > "$GITHUB_WORKSPACE/.fastlycomputerc.json"`,
+  ].join('\n'));
+  assert.equal(steps.find(step => step.startsWith('name: Check the build used the pinned weval')), [
+    'name: Check the build used the pinned weval',
+    // Every installed copy of the weval package, including one nested under js-compute.
+    `        run: test -z "$(find node_modules -path '*/@bytecodealliance/weval/*' -name weval -type f)"`,
+  ].join('\n'));
+  const order = ['name: Install pinned weval', 'run: fastly compute build --non-interactive', 'name: Check the build used the pinned weval', 'uses: actions/upload-artifact@']
+    .map(prefix => steps.findIndex(step => step.startsWith(prefix)));
+  assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `step order ${order}`);
+  // js-compute's ahead-of-time cache is built for the weval version it depends on, so a
+  // dependency update that moves weval must move this pin (URL and digest) with it.
+  // Resolve weval the way js-compute does: its own nested copy first, then the top-level one.
+  const lock = JSON.parse(await readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
+  const weval = lock.packages['node_modules/@fastly/js-compute/node_modules/@bytecodealliance/weval']
+    ?? lock.packages['node_modules/@bytecodealliance/weval'];
+  assert.equal(weval?.version, '0.5.1');
+});
+
+test('checks install dependencies without running install scripts', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/compute.yml', import.meta.url), 'utf8');
+  const steps = workflow.split(/\n {6}- /);
+  // js-compute bundles a wasmtime whose postinstall downloads an unverified binary that the
+  // ahead-of-time build never runs. Running it also makes npm ci, and so the tests, depend on GitHub.
+  assert.ok(steps.includes('run: npm ci --ignore-scripts'));
+  // Catches npm ci, install, i and rebuild without --ignore-scripts anywhere in the workflow,
+  // named steps and scripts included. Other npm spellings and aliases still need a reviewer's eye.
+  assert.doesNotMatch(workflow, /\bnpm (?:ci|install|i|rebuild)\b(?![^\n]*--ignore-scripts)/);
+});
+
+test('checks smoke-test the compiled package before uploading it', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/compute.yml', import.meta.url), 'utf8');
+  const steps = workflow.split(/\n {6}- /);
+  // The unit tests run the source in Node; only this step runs the compiled module that ships.
+  assert.ok(steps.includes('name: Smoke-test the built package in Viceroy\n        run: node --test test/compute.smoke.mjs'));
+  const order = ['run: fastly compute build --non-interactive', 'name: Smoke-test the built package in Viceroy', 'uses: actions/upload-artifact@']
+    .map(prefix => steps.findIndex(step => step.startsWith(prefix)));
+  assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `step order ${order}`);
+  // A second build would replace the checked package before it is uploaded.
+  assert.equal(workflow.match(/fastly compute build/g)?.length, 1);
+});
+
 test('clone follows the observed active version rather than a fixed version', async () => {
   const { dependencies, calls } = fixture();
   const original = dependencies.api;

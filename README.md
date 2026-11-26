@@ -75,11 +75,14 @@ Missing headers, stale timestamps, and bad signatures all return `401`; malforme
 
 ## Getting started
 
-Requires Node.js and the [Fastly CLI](https://www.fastly.com/documentation/reference/cli/).
+Requires the [Fastly CLI](https://www.fastly.com/documentation/reference/cli/) and Node.js 22.20+ (22.x), 24.12+ (24.x) or 25+. On older Node versions the install only prints a warning, but every build then fails with `Cannot find native binding`: a compression library used by the build ships native code only for those versions.
+
+Clone into a path with no spaces. As of `@fastly/js-compute` 4.4.0, the ahead-of-time build passes its cache path to a shell unquoted, so a space anywhere in the checkout path makes `npm run build`, `npm run dev` and `npm run deploy` fail with `Weval initialization failure`.
 
 ```bash
-# Install dependencies
-npm install
+# Install dependencies. --ignore-scripts skips a wasmtime download that
+# the default (ahead-of-time) build never uses.
+npm install --ignore-scripts
 
 # Serve locally through Fastly Compute
 npm run dev
@@ -106,6 +109,8 @@ curl -X POST http://localhost:7676/sync \
 ```
 
 The local server reads sample KV and secret data from the paths configured in `fastly.toml` (`test-data/names.json`, `test-data/failures.json`, and `secrets.local.json`). `secrets.local.json` holds the local `webhook_secret` and is gitignored — create it yourself to exercise a passing signature check.
+
+To check the built package end to end, as CI does after each build, run `node --test test/compute.smoke.mjs` after `npm run build`. It needs [Viceroy](https://github.com/fastly/Viceroy) on your `PATH`, or its path in a `VICEROY` environment variable. It serves `bin/main.wasm` from a temporary copy of the local stores with a throwaway secret, so it never touches your `secrets.local.json`.
 
 ## Configuration
 
